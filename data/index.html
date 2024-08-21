@@ -1,0 +1,148 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    html {
+      font-family: Arial, sans-serif;
+      display: inline-block;
+      margin: 0px auto;
+      text-align: center;
+    }
+    h2 {
+      font-size: 3rem;
+    }
+    p {
+      font-size: 3rem;
+    }
+    .units {
+      font-size: 1.2rem;
+    }
+    .ds-labels {
+      font-size: 1.5rem;
+      vertical-align: middle;
+      padding-bottom: 15px;
+    }
+    pre {
+      text-align: left;
+      display: inline-block;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    .chart-container {
+      width: 100%;
+      max-width: 600px;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>ESP DS18B20 Server</h2>
+  
+  <p>Last Measurement Time: <span id="measurementTime">%MEASUREMENTTIME%</span></p>
+  <p>
+    <i class="fas fa-thermometer-half" style="color:#059e8a;"></i>
+    <span class="ds-labels">Sensors data:</span>
+  </p>
+  <pre id="temperatureData">%TEMPERATUREDATA%</pre>
+  
+  <div class="chart-container">
+    <canvas id="temperatureChart"></canvas>
+  </div>
+
+<script>
+  let chart;
+
+  function initializeChart() {
+    const ctx = document.getElementById('temperatureChart').getContext('2d');
+    
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [], // Initialize with empty data
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'minute',
+              tooltipFormat: 'yyyy-MM-ddTHH:mm:ss',
+              displayFormats: {
+                minute: 'HH:mm'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Time'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Temperature (°C)'
+            },
+            beginAtZero: false
+          }
+        }
+      }
+    });
+  }
+
+  function updateChart(historyData) {
+    const parsedData = historyData.map(data => ({
+      x: new Date(data.time),
+      y: data.temperature
+    }));
+
+    chart.data.labels = parsedData.map(data => data.x);
+    chart.data.datasets[0].data = parsedData;
+
+    chart.update(); // Update the chart with new data
+  }
+
+  function fetchData() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        try {
+          var response = JSON.parse(this.responseText);
+
+          // Display temperature data with sensor addresses
+          document.getElementById("temperatureData").innerHTML = response.sensorData
+            .map(sensor => `Address: ${sensor.address}, Temperature: ${sensor.temperature.toFixed(2)} °C`)
+            .join('<br>');
+          document.getElementById("measurementTime").innerHTML = response.measurementTime;
+
+          updateChart(response.history); // Update chart with historical data
+        } catch (error) {
+          console.error("Error parsing JSON:", error);
+        }
+      }
+    };
+    xhttp.open("GET", "/temperatureData", true);
+    xhttp.send();
+  }
+
+  setInterval(fetchData, 10000); // Update every 10 seconds
+  window.onload = () => {
+    initializeChart(); // Initialize the chart on page load
+    fetchData(); // Fetch initial data
+  };
+</script>
+</body>
+</html>
