@@ -5,7 +5,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <LittleFS.h>
-#include <TimeLib.h> // Include TimeLib library
+#include <TimeLib.h>
 
 // Data wire is connected to GPIO 23
 #define ONE_WIRE_BUS 23
@@ -17,7 +17,6 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 // Variables to store temperature values and timestamp
-String lastMeasurementTime = "";
 int deviceCount = 0;
 
 // Timer variables
@@ -72,26 +71,9 @@ String formatTimeISO8601(unsigned long epochTime) {
   return String(buffer);
 }
 
-// Function to read temperatures and generate JSON data
+// Function to generate JSON data
 String getSensorDataJson() {
-  sensors.requestTemperatures();
-  String jsonResponse = "{\"sensorData\":[";
-
-  for (int i = 0; i < deviceCount; i++) {
-    DeviceAddress deviceAddress;
-    if (sensors.getAddress(deviceAddress, i)) {
-      float tempC = sensors.getTempC(deviceAddress);
-      jsonResponse += "{\"address\":\"" + getDeviceAddress(deviceAddress) + "\", \"temperature\":" + String(tempC) + "}";
-      if (i < deviceCount - 1) {
-        jsonResponse += ",";
-      }
-      // Store the data in the history array
-      history[historyIndex] = {getDeviceAddress(deviceAddress), tempC, lastMeasurementTime};
-      historyIndex = (historyIndex + 1) % HISTORY_SIZE;
-    }
-  }
-
-  jsonResponse += "], \"measurementTime\":\"" + lastMeasurementTime + "\", \"history\":[";
+  String jsonResponse = "{\"history\":[";
 
   bool firstEntry = true;
   for (int i = 0; i < HISTORY_SIZE; i++) {
@@ -111,12 +93,25 @@ String getSensorDataJson() {
 
 // Function to update the temperature data
 void updateTemperatureData() {
+  sensors.requestTemperatures();
+  
   timeClient.update();
   
+  String currentTime;
   if (timeClient.isTimeSet()) {
-    lastMeasurementTime = formatTimeISO8601(timeClient.getEpochTime());
+    currentTime = formatTimeISO8601(timeClient.getEpochTime());
   } else {
     Serial.println("NTP Time not synchronized yet");
+  }
+
+  // Store the latest data in the history array
+  for (int i = 0; i < deviceCount; i++) {
+    DeviceAddress deviceAddress;
+    if (sensors.getAddress(deviceAddress, i)) {
+      float tempC = sensors.getTempC(deviceAddress);
+      history[historyIndex] = {getDeviceAddress(deviceAddress), tempC, currentTime};
+      historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+    }
   }
 
   // Generate the latest JSON response and store it in the global variable

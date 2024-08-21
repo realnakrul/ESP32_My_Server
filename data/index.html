@@ -45,10 +45,9 @@
 <body>
   <h2>ESP DS18B20 Server</h2>
   
-  <p>Last Measurement Time: <span id="measurementTime">%MEASUREMENTTIME%</span></p>
   <p>
     <i class="fas fa-thermometer-half" style="color:#059e8a;"></i>
-    <span class="ds-labels">Sensors data:</span>
+    <span class="ds-labels">Latest Measurement:</span>
   </p>
   <pre id="temperatureData">%TEMPERATUREDATA%</pre>
   
@@ -122,11 +121,12 @@
         try {
           var response = JSON.parse(this.responseText);
 
-          // Display temperature data with sensor addresses
-          document.getElementById("temperatureData").innerHTML = response.sensorData
-            .map(sensor => `Address: ${sensor.address}, Temperature: ${sensor.temperature.toFixed(2)} °C`)
-            .join('<br>');
-          document.getElementById("measurementTime").innerHTML = response.measurementTime;
+          // Display only the latest temperature measurement
+          if (response.history && response.history.length > 0) {
+            const latestEntry = response.history[response.history.length - 1];
+            document.getElementById("temperatureData").innerHTML = 
+              `Address: ${latestEntry.address}, Temperature: ${latestEntry.temperature.toFixed(2)} °C, Time: ${latestEntry.time}`;
+          }
 
           updateChart(response.history); // Update chart with historical data
         } catch (error) {
